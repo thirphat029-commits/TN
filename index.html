@@ -1,143 +1,244 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR Washing Machine</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Simple Mobile AR Lab - Motor Status</title>
 
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <!-- Open-source libraries. The versions are pinned so A-Frame and AR.js match. -->
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
   <style>
-    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111;
+    }
+
+    #top-panel {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      width: min(92vw, 520px);
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.68);
+      color: white;
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.4;
+      backdrop-filter: blur(4px);
+    }
+
     #controls {
-      position: fixed; z-index: 999; bottom: 20px; left: 50%;
-      transform: translateX(-50%); display: flex; gap: 10px;
-      flex-wrap: wrap; justify-content: center; width: 95%;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 18px;
+      z-index: 20;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 12px;
     }
+
     button {
-      border: none; border-radius: 12px; padding: 14px 18px;
-      font-size: 16px; font-weight: bold; background: rgba(20,20,20,.85);
-      color: white; cursor: pointer;
+      min-width: 132px;
+      min-height: 48px;
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
     }
-    button:active { transform: scale(.95); }
-    #speedText {
-      position: fixed; z-index: 999; top: 20px; left: 50%;
-      transform: translateX(-50%); background: rgba(0,0,0,.7);
-      color: white; padding: 10px 18px; border-radius: 10px; font-size: 18px;
+
+    #run-button { background: #ffffff; color: #111111; }
+    #status-button { background: #ffd54f; color: #111111; }
+
+    .hint {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      opacity: 0.8;
     }
   </style>
+
+  <script>
+    // A tiny reusable component that rotates an object without extra libraries.
+    AFRAME.registerComponent('spin-control', {
+      schema: {
+        axis: { type: 'string', default: 'y' },
+        speed: { type: 'number', default: 180 },
+        active: { type: 'boolean', default: true }
+      },
+
+      tick: function (_time, deltaMs) {
+        if (!this.data.active || !deltaMs) return;
+
+        const radians = THREE.MathUtils.degToRad(this.data.speed * deltaMs / 1000);
+        const axis = this.data.axis;
+
+        if (axis === 'x') this.el.object3D.rotation.x += radians;
+        if (axis === 'y') this.el.object3D.rotation.y += radians;
+        if (axis === 'z') this.el.object3D.rotation.z += radians;
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const marker = document.querySelector('#hiro-marker');
+      const shaft = document.querySelector('#shaft');
+      const motorBody = document.querySelector('#motor-body');
+      const warningLamp = document.querySelector('#warning-lamp');
+      const arLabel = document.querySelector('#ar-label');
+      const topPanel = document.querySelector('#top-panel');
+      const runButton = document.querySelector('#run-button');
+      const statusButton = document.querySelector('#status-button');
+
+      let running = true;
+      let warning = false;
+
+      marker.addEventListener('markerFound', () => {
+        topPanel.innerHTML = 'พบ Hiro Marker แล้ว — โมเดลมอเตอร์พร้อมใช้งาน<span class="hint">แตะปุ่มด้านล่างเพื่อทดลองควบคุม</span>';
+      });
+
+      marker.addEventListener('markerLost', () => {
+        topPanel.innerHTML = 'เล็งกล้องไปที่ Hiro Marker<span class="hint">วาง Marker บนโต๊ะที่มีแสงเพียงพอและให้เห็นกรอบดำครบทั้งสี่ด้าน</span>';
+      });
+
+      runButton.addEventListener('click', () => {
+        running = !running;
+        shaft.setAttribute('spin-control', 'active', running);
+        runButton.textContent = running ? 'หยุดมอเตอร์' : 'เริ่มมอเตอร์';
+      });
+
+      statusButton.addEventListener('click', () => {
+        warning = !warning;
+
+        if (warning) {
+          motorBody.setAttribute('color', '#ef5350');
+          warningLamp.setAttribute('color', '#ff1744');
+          warningLamp.setAttribute('material', 'emissive', '#ff1744');
+          arLabel.setAttribute('value', 'MOTOR M1\nSTATUS: WARNING');
+          statusButton.textContent = 'เปลี่ยนเป็นปกติ';
+        } else {
+          motorBody.setAttribute('color', '#1976d2');
+          warningLamp.setAttribute('color', '#00e676');
+          warningLamp.setAttribute('material', 'emissive', '#00c853');
+          arLabel.setAttribute('value', 'MOTOR M1\nSTATUS: NORMAL');
+          statusButton.textContent = 'จำลองคำเตือน';
+        }
+      });
+    });
+  </script>
 </head>
 
 <body>
-  <div id="speedText">ความเร็วถัง: <span id="speedValue">0</span></div>
+  <div id="top-panel">
+    เล็งกล้องไปที่ Hiro Marker
+    <span class="hint">อนุญาตให้เว็บไซต์ใช้กล้องเมื่อเบราว์เซอร์ถาม</span>
+  </div>
 
   <div id="controls">
-    <button onclick="setSpeed(0)">หยุด</button>
-    <button onclick="setSpeed(1)">ช้า</button>
-    <button onclick="setSpeed(2)">กลาง</button>
-    <button onclick="setSpeed(4)">เร็ว</button>
-    <button onclick="toggleDoor()">เปิด/ปิดฝา</button>
+    <button id="run-button" type="button">หยุดมอเตอร์</button>
+    <button id="status-button" type="button">จำลองคำเตือน</button>
   </div>
 
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true; antialias: true"
-    arjs="sourceType: webcam; debugUIEnabled: false;">
+    renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true"
+    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false"
+  >
+    <a-marker
+      id="hiro-marker"
+      preset="hiro"
+      emitevents="true"
+      smooth="true"
+      smooth-count="8"
+      smooth-tolerance="0.01"
+      smooth-threshold="3"
+    >
+      <!-- Floor plate -->
+      <a-box
+        position="0 0.04 0"
+        width="1.35"
+        height="0.08"
+        depth="0.85"
+        color="#455a64"
+        roughness="0.8"
+      ></a-box>
 
-    <a-light type="ambient" color="#ffffff" intensity="2"></a-light>
-    <a-light type="directional" position="2 4 3" intensity="3"></a-light>
+      <!-- Two mounting feet -->
+      <a-box position="-0.42 0.15 0" width="0.18" height="0.18" depth="0.55" color="#263238"></a-box>
+      <a-box position="0.42 0.15 0" width="0.18" height="0.18" depth="0.55" color="#263238"></a-box>
 
-    <a-marker preset="hiro" id="hiroMarker">
+      <!-- Motor housing: cylinder lies along X axis -->
+      <a-cylinder
+        id="motor-body"
+        position="0 0.47 0"
+        rotation="0 0 90"
+        radius="0.32"
+        height="0.72"
+        segments-radial="32"
+        color="#1976d2"
+        metalness="0.25"
+        roughness="0.55"
+      ></a-cylinder>
 
-      <a-entity id="washingMachine">
+      <!-- Rear cap -->
+      <a-cylinder
+        position="-0.40 0.47 0"
+        rotation="0 0 90"
+        radius="0.27"
+        height="0.12"
+        color="#90a4ae"
+      ></a-cylinder>
 
-        <!-- ตัวเครื่อง -->
-        <a-box position="0 0.8 0" width="1.6" height="1.6" depth="1.1" color="#e8e8e8"></a-box>
-
-        <!-- แผงด้านบน -->
-        <a-box position="0 1.63 -0.01" width="1.55" height="0.08" depth="1.05" color="#d0d0d0"></a-box>
-
-        <!-- แผงควบคุม -->
-        <a-box position="0 1.25 -0.57" width="1.4" height="0.3" depth="0.08" color="#222222"></a-box>
-
-        <!-- ปุ่มหมุน -->
-        <a-cylinder position="-0.45 1.25 -0.63" radius="0.1" height="0.04"
-                     rotation="90 0 0" color="#ffffff"></a-cylinder>
-
-        <!-- หน้าจอ -->
-        <a-box position="0.35 1.25 -0.63" width="0.35" height="0.13"
-               depth="0.03" color="#39d5ff"></a-box>
-
-        <!-- ถังซัก -->
-        <a-entity id="drum" position="0 0.72 -0.58">
-          <a-torus radius="0.47" radius-tubular="0.08"
-                   rotation="90 0 0" color="#555555"></a-torus>
-          <a-circle radius="0.39" rotation="90 0 0" color="#222222"></a-circle>
-
-          <a-box position="0 0 0.02" width="0.08" height="0.7" depth="0.04"
-                 rotation="0 0 45" color="#777777"></a-box>
-          <a-box position="0 0 0.02" width="0.08" height="0.7" depth="0.04"
-                 rotation="0 0 -45" color="#777777"></a-box>
-        </a-entity>
-
-        <!-- ฝา -->
-        <a-entity id="door" position="0 0.72 -0.68">
-          <a-torus radius="0.52" radius-tubular="0.06"
-                   rotation="90 0 0" color="#cccccc"></a-torus>
-          <a-circle radius="0.45" rotation="90 0 0"
-                    color="#4d6f7d" opacity="0.75"></a-circle>
-        </a-entity>
-
-        <!-- ฐาน -->
-        <a-box position="0 0.03 0" width="1.65" height="0.1"
-               depth="1.15" color="#bbbbbb"></a-box>
-
+      <!-- Shaft assembly: parent fixes the shaft direction; child spins locally -->
+      <a-entity position="0.52 0.47 0" rotation="0 0 90">
+        <a-cylinder
+          id="shaft"
+          radius="0.09"
+          height="0.42"
+          color="#cfd8dc"
+          metalness="0.8"
+          roughness="0.2"
+          spin-control="axis: y; speed: 220; active: true"
+        >
+          <a-box position="0 0.12 0.09" width="0.05" height="0.18" depth="0.06" color="#ffeb3b"></a-box>
+        </a-cylinder>
       </a-entity>
+
+      <!-- Status lamp -->
+      <a-sphere
+        id="warning-lamp"
+        position="0 0.87 0"
+        radius="0.075"
+        color="#00e676"
+        material="emissive: #00c853; emissiveIntensity: 0.8"
+      ></a-sphere>
+
+      <!-- AR information label -->
+      <a-text
+        id="ar-label"
+        value="MOTOR M1\nSTATUS: NORMAL"
+        position="0 1.12 0"
+        rotation="-90 0 0"
+        align="center"
+        width="2.4"
+        color="#ffffff"
+        side="double"
+      ></a-text>
     </a-marker>
 
     <a-entity camera></a-entity>
   </a-scene>
-
-  <script>
-    const drum = document.querySelector("#drum");
-    const door = document.querySelector("#door");
-    const speedValue = document.querySelector("#speedValue");
-
-    let speed = 0;
-    let doorOpen = false;
-    let drumRotation = 0;
-    let lastTime = performance.now();
-
-    function setSpeed(value) {
-      speed = value;
-      speedValue.textContent = value;
-    }
-
-    function toggleDoor() {
-      doorOpen = !doorOpen;
-
-      door.setAttribute("animation",
-        "property: rotation; " +
-        "to: " + (doorOpen ? "-70 0 0" : "0 0 0") + "; " +
-        "dur: 600; easing: easeOutQuad"
-      );
-    }
-
-    function animateDrum(time) {
-      const delta = (time - lastTime) / 1000;
-      lastTime = time;
-
-      if (speed > 0 && !doorOpen) {
-        drumRotation += speed * 180 * delta;
-        drum.setAttribute("rotation", `0 0 ${drumRotation}`);
-      }
-
-      requestAnimationFrame(animateDrum);
-    }
-
-    requestAnimationFrame(animateDrum);
-  </script>
 </body>
 </html>
