@@ -1,244 +1,298 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Simple Mobile AR Lab - Motor Status</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Snake - Hiro Marker</title>
 
-  <!-- Open-source libraries. The versions are pinned so A-Frame and AR.js match. -->
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
   <style>
-    * { box-sizing: border-box; }
     body {
       margin: 0;
       overflow: hidden;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #111;
+      font-family: Arial, sans-serif;
     }
 
-    #top-panel {
+    #title {
       position: fixed;
-      top: 12px;
+      top: 15px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 20;
-      width: min(92vw, 520px);
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: rgba(0, 0, 0, 0.68);
+      z-index: 10;
       color: white;
-      text-align: center;
-      font-size: 15px;
-      line-height: 1.4;
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,.7);
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    #status {
+      position: fixed;
+      top: 65px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      color: white;
+      background: rgba(0,0,0,.55);
+      padding: 7px 14px;
+      border-radius: 10px;
     }
 
     #controls {
       position: fixed;
-      left: 0;
-      right: 0;
       bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 20;
+      width: 95%;
       display: flex;
       justify-content: center;
-      gap: 10px;
-      padding: 0 12px;
+      flex-wrap: wrap;
+      gap: 9px;
     }
 
     button {
-      min-width: 132px;
-      min-height: 48px;
       border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
+      border-radius: 14px;
+      padding: 14px 17px;
+      color: white;
+      background: rgba(25,25,25,.9);
       font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      touch-action: manipulation;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0,0,0,.35);
     }
 
-    #run-button { background: #ffffff; color: #111111; }
-    #status-button { background: #ffd54f; color: #111111; }
-
-    .hint {
-      display: block;
-      margin-top: 4px;
-      font-size: 12px;
-      opacity: 0.8;
+    button:active {
+      transform: scale(.94);
     }
+
+    #bite { background: #b71c1c; }
+    #poison { background: #6a1b9a; }
+    #saw { background: #455a64; }
+    #reset { background: #1565c0; }
   </style>
-
-  <script>
-    // A tiny reusable component that rotates an object without extra libraries.
-    AFRAME.registerComponent('spin-control', {
-      schema: {
-        axis: { type: 'string', default: 'y' },
-        speed: { type: 'number', default: 180 },
-        active: { type: 'boolean', default: true }
-      },
-
-      tick: function (_time, deltaMs) {
-        if (!this.data.active || !deltaMs) return;
-
-        const radians = THREE.MathUtils.degToRad(this.data.speed * deltaMs / 1000);
-        const axis = this.data.axis;
-
-        if (axis === 'x') this.el.object3D.rotation.x += radians;
-        if (axis === 'y') this.el.object3D.rotation.y += radians;
-        if (axis === 'z') this.el.object3D.rotation.z += radians;
-      }
-    });
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const marker = document.querySelector('#hiro-marker');
-      const shaft = document.querySelector('#shaft');
-      const motorBody = document.querySelector('#motor-body');
-      const warningLamp = document.querySelector('#warning-lamp');
-      const arLabel = document.querySelector('#ar-label');
-      const topPanel = document.querySelector('#top-panel');
-      const runButton = document.querySelector('#run-button');
-      const statusButton = document.querySelector('#status-button');
-
-      let running = true;
-      let warning = false;
-
-      marker.addEventListener('markerFound', () => {
-        topPanel.innerHTML = 'พบ Hiro Marker แล้ว — โมเดลมอเตอร์พร้อมใช้งาน<span class="hint">แตะปุ่มด้านล่างเพื่อทดลองควบคุม</span>';
-      });
-
-      marker.addEventListener('markerLost', () => {
-        topPanel.innerHTML = 'เล็งกล้องไปที่ Hiro Marker<span class="hint">วาง Marker บนโต๊ะที่มีแสงเพียงพอและให้เห็นกรอบดำครบทั้งสี่ด้าน</span>';
-      });
-
-      runButton.addEventListener('click', () => {
-        running = !running;
-        shaft.setAttribute('spin-control', 'active', running);
-        runButton.textContent = running ? 'หยุดมอเตอร์' : 'เริ่มมอเตอร์';
-      });
-
-      statusButton.addEventListener('click', () => {
-        warning = !warning;
-
-        if (warning) {
-          motorBody.setAttribute('color', '#ef5350');
-          warningLamp.setAttribute('color', '#ff1744');
-          warningLamp.setAttribute('material', 'emissive', '#ff1744');
-          arLabel.setAttribute('value', 'MOTOR M1\nSTATUS: WARNING');
-          statusButton.textContent = 'เปลี่ยนเป็นปกติ';
-        } else {
-          motorBody.setAttribute('color', '#1976d2');
-          warningLamp.setAttribute('color', '#00e676');
-          warningLamp.setAttribute('material', 'emissive', '#00c853');
-          arLabel.setAttribute('value', 'MOTOR M1\nSTATUS: NORMAL');
-          statusButton.textContent = 'จำลองคำเตือน';
-        }
-      });
-    });
-  </script>
 </head>
 
 <body>
-  <div id="top-panel">
-    เล็งกล้องไปที่ Hiro Marker
-    <span class="hint">อนุญาตให้เว็บไซต์ใช้กล้องเมื่อเบราว์เซอร์ถาม</span>
-  </div>
+
+  <div id="title">🐍 AR SNAKE</div>
+  <div id="status">ส่องกล้องไปที่ Hiro Marker</div>
 
   <div id="controls">
-    <button id="run-button" type="button">หยุดมอเตอร์</button>
-    <button id="status-button" type="button">จำลองคำเตือน</button>
+    <button id="bite" onclick="snakeBite()">🐍 กัด</button>
+    <button id="poison" onclick="shootPoison()">☠️ พ่นพิษ</button>
+    <button id="saw" onclick="sawAttack()">⚙️ เลื่อย</button>
+    <button id="reset" onclick="resetSnake()">↩️ รีเซ็ต</button>
   </div>
 
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true"
-    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false"
-  >
-    <a-marker
-      id="hiro-marker"
-      preset="hiro"
-      emitevents="true"
-      smooth="true"
-      smooth-count="8"
-      smooth-tolerance="0.01"
-      smooth-threshold="3"
-    >
-      <!-- Floor plate -->
-      <a-box
-        position="0 0.04 0"
-        width="1.35"
-        height="0.08"
-        depth="0.85"
-        color="#455a64"
-        roughness="0.8"
-      ></a-box>
+    renderer="antialias: true; logarithmicDepthBuffer: true"
+    arjs="sourceType: webcam; debugUIEnabled: false;">
 
-      <!-- Two mounting feet -->
-      <a-box position="-0.42 0.15 0" width="0.18" height="0.18" depth="0.55" color="#263238"></a-box>
-      <a-box position="0.42 0.15 0" width="0.18" height="0.18" depth="0.55" color="#263238"></a-box>
+    <a-light type="ambient" color="#ffffff" intensity="2"></a-light>
+    <a-light type="directional" position="2 4 3" intensity="2"></a-light>
 
-      <!-- Motor housing: cylinder lies along X axis -->
-      <a-cylinder
-        id="motor-body"
-        position="0 0.47 0"
-        rotation="0 0 90"
-        radius="0.32"
-        height="0.72"
-        segments-radial="32"
-        color="#1976d2"
-        metalness="0.25"
-        roughness="0.55"
-      ></a-cylinder>
+    <!-- Hiro Marker -->
+    <a-marker preset="hiro" id="hiroMarker">
 
-      <!-- Rear cap -->
-      <a-cylinder
-        position="-0.40 0.47 0"
-        rotation="0 0 90"
-        radius="0.27"
-        height="0.12"
-        color="#90a4ae"
-      ></a-cylinder>
+      <!-- งู -->
+      <a-entity id="snake">
 
-      <!-- Shaft assembly: parent fixes the shaft direction; child spins locally -->
-      <a-entity position="0.52 0.47 0" rotation="0 0 90">
-        <a-cylinder
-          id="shaft"
-          radius="0.09"
-          height="0.42"
-          color="#cfd8dc"
-          metalness="0.8"
-          roughness="0.2"
-          spin-control="axis: y; speed: 220; active: true"
-        >
-          <a-box position="0 0.12 0.09" width="0.05" height="0.18" depth="0.06" color="#ffeb3b"></a-box>
-        </a-cylinder>
+        <!-- ลำตัวงู -->
+        <a-entity id="body">
+          <a-cylinder position="0 0.30 0"
+                      radius="0.16"
+                      height="0.9"
+                      color="#2e7d32"
+                      rotation="0 0 90">
+          </a-cylinder>
+
+          <a-cylinder position="0.42 0.30 0"
+                      radius="0.14"
+                      height="0.65"
+                      color="#388e3c"
+                      rotation="0 0 90">
+          </a-cylinder>
+
+          <a-cylinder position="-0.42 0.30 0"
+                      radius="0.14"
+                      height="0.65"
+                      color="#388e3c"
+                      rotation="0 0 90">
+          </a-cylinder>
+        </a-entity>
+
+        <!-- หัว -->
+        <a-sphere id="head"
+                  position="0 0.30 -0.62"
+                  radius="0.25"
+                  color="#43a047">
+        </a-sphere>
+
+        <!-- ตา -->
+        <a-sphere position="-0.12 0.43 -0.80"
+                  radius="0.045"
+                  color="#ffffff"></a-sphere>
+        <a-sphere position="0.12 0.43 -0.80"
+                  radius="0.045"
+                  color="#ffffff"></a-sphere>
+
+        <a-sphere position="-0.12 0.43 -0.835"
+                  radius="0.018"
+                  color="#111111"></a-sphere>
+        <a-sphere position="0.12 0.43 -0.835"
+                  radius="0.018"
+                  color="#111111"></a-sphere>
+
+        <!-- ปาก -->
+        <a-box id="mouth"
+               position="0 0.25 -0.84"
+               width="0.20"
+               height="0.035"
+               depth="0.02"
+               color="#111111">
+        </a-box>
+
+        <!-- เขี้ยวแบบการ์ตูน -->
+        <a-cone id="fangLeft"
+                position="-0.06 0.18 -0.86"
+                radius-bottom="0.025"
+                radius-top="0"
+                height="0.12"
+                color="#ffffff">
+        </a-cone>
+
+        <a-cone id="fangRight"
+                position="0.06 0.18 -0.86"
+                radius-bottom="0.025"
+                radius-top="0"
+                height="0.12"
+                color="#ffffff">
+        </a-cone>
+
+        <!-- ลิ้น -->
+        <a-box id="tongue"
+               position="0 0.29 -0.90"
+               width="0.035"
+               height="0.015"
+               depth="0.22"
+               color="#e91e63">
+        </a-box>
+
+        <!-- เอฟเฟกต์พิษ -->
+        <a-entity id="poisonEffect" visible="false">
+          <a-sphere position="0 0.30 -1.0"
+                    radius="0.08"
+                    color="#ce93d8"
+                    opacity="0.8">
+          </a-sphere>
+          <a-sphere position="0 0.30 -1.18"
+                    radius="0.06"
+                    color="#ab47bc"
+                    opacity="0.7">
+          </a-sphere>
+          <a-sphere position="0 0.30 -1.34"
+                    radius="0.04"
+                    color="#7b1fa2"
+                    opacity="0.6">
+          </a-sphere>
+        </a-entity>
+
+        <!-- เอฟเฟกต์เลื่อยแบบการ์ตูน -->
+        <a-entity id="sawEffect" visible="false">
+          <a-torus position="0 0.30 -0.95"
+                   radius="0.18"
+                   radius-tubular="0.035"
+                   color="#b0bec5"
+                   rotation="90 0 0">
+          </a-torus>
+          <a-torus position="0 0.30 -0.95"
+                   radius="0.12"
+                   radius-tubular="0.025"
+                   color="#eceff1"
+                   rotation="90 0 0">
+          </a-torus>
+        </a-entity>
+
       </a-entity>
 
-      <!-- Status lamp -->
-      <a-sphere
-        id="warning-lamp"
-        position="0 0.87 0"
-        radius="0.075"
-        color="#00e676"
-        material="emissive: #00c853; emissiveIntensity: 0.8"
-      ></a-sphere>
-
-      <!-- AR information label -->
-      <a-text
-        id="ar-label"
-        value="MOTOR M1\nSTATUS: NORMAL"
-        position="0 1.12 0"
-        rotation="-90 0 0"
-        align="center"
-        width="2.4"
-        color="#ffffff"
-        side="double"
-      ></a-text>
     </a-marker>
 
     <a-entity camera></a-entity>
   </a-scene>
+
+  <script>
+    const snake = document.querySelector("#snake");
+    const head = document.querySelector("#head");
+    const poisonEffect = document.querySelector("#poisonEffect");
+    const sawEffect = document.querySelector("#sawEffect");
+    const status = document.querySelector("#status");
+
+    function animate(target, property, from, to, duration = 350) {
+      target.setAttribute("animation", {
+        property: property,
+        from: from,
+        to: to,
+        dur: duration,
+        easing: "easeOutBack"
+      });
+    }
+
+    function snakeBite() {
+      status.textContent = "🐍 งูกำลังกัด!";
+      animate(head, "position", "0 0.30 -0.62", "0 0.30 -0.95", 180);
+
+      setTimeout(() => {
+        animate(head, "position", "0 0.30 -0.95", "0 0.30 -0.62", 250);
+      }, 220);
+    }
+
+    function shootPoison() {
+      status.textContent = "☠️ เอฟเฟกต์พิษ!";
+      poisonEffect.setAttribute("visible", true);
+
+      poisonEffect.setAttribute("animation__scale", {
+        property: "scale",
+        from: "0.2 0.2 0.2",
+        to: "1.5 1.5 1.5",
+        dur: 450,
+        easing: "easeOutQuad"
+      });
+
+      setTimeout(() => {
+        poisonEffect.setAttribute("visible", false);
+      }, 700);
+    }
+
+    function sawAttack() {
+      status.textContent = "⚙️ เอฟเฟกต์เลื่อย!";
+      sawEffect.setAttribute("visible", true);
+
+      sawEffect.setAttribute("animation__spin", {
+        property: "rotation",
+        from: "0 0 0",
+        to: "0 0 360",
+        dur: 500,
+        easing: "linear"
+      });
+
+      setTimeout(() => {
+        sawEffect.setAttribute("visible", false);
+      }, 700);
+    }
+
+    function resetSnake() {
+      poisonEffect.setAttribute("visible", false);
+      sawEffect.setAttribute("visible", false);
+      head.setAttribute("position", "0 0.30 -0.62");
+      status.textContent = "พร้อมเล่น — ส่อง Hiro Marker";
+    }
+  </script>
+
 </body>
 </html>
